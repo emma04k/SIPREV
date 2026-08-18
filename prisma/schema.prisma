@@ -7,20 +7,46 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Phase 1 intentionally defines only shared foundation enums. Concrete tables,
-// migrations, and seed data belong to Phase 2 after demo data boundaries are set.
+enum InstitutionType {
+  CENTRAL_ADMIN
+  POLICE_STATION
+  PROSECUTOR_OFFICE
+  OVERSIGHT
+}
+
+enum InstitutionStatus {
+  ACTIVE
+  INACTIVE
+}
+
 enum UserRole {
   SYSTEM_ADMIN
   INSTITUTION_ADMIN
-  AUTHORIZED_PROFESSIONAL
+  CASE_WORKER
+  PROSECUTOR
   AUDITOR
 }
 
 enum AccountStatus {
-  PENDING
+  INVITED
   ACTIVE
   SUSPENDED
   REVOKED
+}
+
+enum CaseType {
+  INITIAL_REPORT
+  POLICE_REPORT
+  PROSECUTOR_REFERRAL
+}
+
+enum ViolenceType {
+  PHYSICAL
+  PSYCHOLOGICAL
+  SEXUAL
+  ECONOMIC
+  DIGITAL
+  INSTITUTIONAL
 }
 
 enum CaseRiskLevel {
@@ -35,4 +61,198 @@ enum CaseStatus {
   IN_FOLLOW_UP
   REFERRED
   CLOSED
+}
+
+enum CaseEventCategory {
+  INTAKE
+  RISK_REVIEW
+  FOLLOW_UP
+  REFERRAL
+  STATUS_CHANGE
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  TRANSFERRED
+  COMPLETED
+}
+
+enum AuditAction {
+  CREATE
+  VIEW
+  UPDATE
+  ASSIGN
+  REFER
+  CLOSE
+  SEED
+}
+
+model Institution {
+  id        String            @id @default(cuid())
+  code      String            @unique
+  name      String
+  type      InstitutionType
+  status    InstitutionStatus @default(ACTIVE)
+  createdAt DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime          @updatedAt @db.Timestamptz(3)
+
+  users         User[]
+  reportedCases Case[]           @relation("ReportingInstitution")
+  currentCases  Case[]           @relation("CurrentInstitution")
+  assignments   CaseAssignment[]
+  events        CaseEvent[]
+  auditLogs     AuditLog[]
+
+  @@index([type])
+  @@index([status])
+  @@map("institutions")
+}
+
+model User {
+  id                  String        @id @default(cuid())
+  institutionId       String
+  email               String        @unique
+  displayName         String
+  role                UserRole
+  status              AccountStatus @default(INVITED)
+  passwordHash        String?
+  authProviderSubject String?
+  createdAt           DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime      @updatedAt @db.Timestamptz(3)
+
+  institution  Institution      @relation(fields: [institutionId], references: [id], onDelete: Restrict)
+  createdCases Case[]
+  events       CaseEvent[]
+  assignments  CaseAssignment[]
+  auditLogs    AuditLog[]
+
+  @@index([institutionId])
+  @@index([role, status])
+  @@map("users")
+}
+
+model Case {
+  id                     String         @id @default(cuid())
+  publicCode             String         @unique
+  caseType               CaseType
+  violenceTypes          ViolenceType[] @default([])
+  riskLevel              CaseRiskLevel
+  status                 CaseStatus     @default(OPEN)
+  nonSensitiveSummary    String
+  reportingInstitutionId String
+  currentInstitutionId   String
+  createdByUserId        String
+  createdAt              DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime       @updatedAt @db.Timestamptz(3)
+  closedAt               DateTime?      @db.Timestamptz(3)
+
+  reportingInstitution Institution          @relation("ReportingInstitution", fields: [reportingInstitutionId], references: [id], onDelete: Restrict)
+  currentInstitution   Institution          @relation("CurrentInstitution", fields: [currentInstitutionId], references: [id], onDelete: Restrict)
+  createdByUser        User                 @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  protectedPerson      ProtectedPerson?
+  aggressorReferences  AggressorReference[]
+  events               CaseEvent[]
+  assignments          CaseAssignment[]
+  auditLogs            AuditLog[]
+
+  @@index([status, riskLevel, createdAt])
+  @@index([reportingInstitutionId])
+  @@index([currentInstitutionId])
+  @@index([createdByUserId])
+  @@map("cases")
+}
+
+model ProtectedPerson {
+  id                 String   @id @default(cuid())
+  caseId             String   @unique
+  demoFullName       String
+  demoDocumentNumber String
+  demoBirthYear      Int?
+  demoContactNote    String?
+  demoLocationNote   String?
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime @updatedAt @db.Timestamptz(3)
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@map("protected_persons")
+}
+
+model AggressorReference {
+  id                 String   @id @default(cuid())
+  caseId             String
+  demoAlias          String
+  relationshipToCase String?
+  triageContext      String?
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime @updatedAt @db.Timestamptz(3)
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("aggressor_references")
+}
+
+model CaseEvent {
+  id            String            @id @default(cuid())
+  caseId        String
+  category      CaseEventCategory
+  title         String
+  detail        String
+  occurredAt    DateTime          @default(now()) @db.Timestamptz(3)
+  actorUserId   String?
+  institutionId String?
+  createdAt     DateTime          @default(now()) @db.Timestamptz(3)
+
+  case        Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actorUser   User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  institution Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+
+  @@index([caseId, occurredAt])
+  @@index([actorUserId])
+  @@index([institutionId])
+  @@map("case_events")
+}
+
+model CaseAssignment {
+  id             String           @id @default(cuid())
+  caseId         String
+  institutionId  String
+  assignedUserId String?
+  status         AssignmentStatus @default(ACTIVE)
+  assignedAt     DateTime         @default(now()) @db.Timestamptz(3)
+  endedAt        DateTime?        @db.Timestamptz(3)
+  reason         String?
+
+  case         Case        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  institution  Institution @relation(fields: [institutionId], references: [id], onDelete: Restrict)
+  assignedUser User?       @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  @@index([caseId])
+  @@index([institutionId, status])
+  @@index([assignedUserId])
+  @@map("case_assignments")
+}
+
+model AuditLog {
+  id                 String      @id @default(cuid())
+  actorUserId        String?
+  actorInstitutionId String?
+  caseId             String?
+  action             AuditAction
+  entityType         String
+  entityId           String
+  metadata           Json?
+  createdAt          DateTime    @default(now()) @db.Timestamptz(3)
+
+  actorUser        User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorInstitution Institution? @relation(fields: [actorInstitutionId], references: [id], onDelete: SetNull)
+  case             Case?        @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([caseId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([actorInstitutionId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
 }
