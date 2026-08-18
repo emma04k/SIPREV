@@ -7,7 +7,7 @@ const authCookieNames = [
   '__Secure-next-auth.session-token',
 ]
 
-const privatePathPrefixes = ['/dashboard']
+const privatePathPrefixes = ['/dashboard', '/cases']
 
 function hasAuthSessionCookie(request: NextRequest): boolean {
   return authCookieNames.some((cookieName) => Boolean(request.cookies.get(cookieName)?.value))
@@ -28,5 +28,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*'],
+  matcher: ['/dashboard/:path*', '/cases/:path*'],
 }
