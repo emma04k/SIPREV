@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Phase 1 intentionally defines only shared foundation enums. Concrete tables,
+// migrations, and seed data belong to Phase 2 after demo data boundaries are set.
+enum UserRole {
+  SYSTEM_ADMIN
+  INSTITUTION_ADMIN
+  AUTHORIZED_PROFESSIONAL
+  AUDITOR
+}
+
+enum AccountStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum CaseRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum CaseStatus {
+  OPEN
+  IN_FOLLOW_UP
+  REFERRED
+  CLOSED
+}

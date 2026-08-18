@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: siprev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-siprev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-siprev_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-siprev}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - siprev_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: siprev-app
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-siprev}:${POSTGRES_PASSWORD:-siprev_dev_password}@db:5432/${POSTGRES_DB:-siprev}?schema=public
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - .:/app
+      - siprev_node_modules:/app/node_modules
+    command: npm run dev -- --hostname 0.0.0.0
+    tty: true
+    stdin_open: true
+
+volumes:
+  siprev_node_modules:
+  siprev_postgres_data:
