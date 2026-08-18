@@ -63,7 +63,7 @@ async function main() {
     }),
     prisma.user.findMany({
       where: { email: { in: expectedUserEmails } },
-      select: { email: true },
+      select: { email: true, passwordHash: true, status: true },
     }),
     prisma.case.findMany({
       where: { publicCode: { in: expectedCaseCodes } },
@@ -88,6 +88,13 @@ async function main() {
     users.map((user) => user.email),
     expectedUserEmails,
   )
+
+  for (const user of users) {
+    if (user.status !== 'ACTIVE' || !user.passwordHash || !user.passwordHash.startsWith('$2')) {
+      throw new Error(`Seed verification failed for ${user.email}: expected active credential user with bcrypt password hash`)
+    }
+  }
+
   assertContainsAll(
     'expected demo cases',
     cases.map((caseRecord) => caseRecord.publicCode),

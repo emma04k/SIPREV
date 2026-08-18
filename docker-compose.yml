@@ -32,6 +32,8 @@ services:
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-siprev-phase3-local-demo-only-secret-not-for-production}
+      AUTH_SECRET: ${AUTH_SECRET:-siprev-phase3-local-demo-only-secret-not-for-production}
     ports:
       - "${APP_PORT:-3000}:3000"
     volumes:

@@ -1,7 +1,10 @@
 import { PrismaClient } from '@prisma/client'
+import { hashSync } from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
+const DEMO_AUTH_PASSWORD = 'SiprevDemo2026!'
+const demoPasswordHash = hashSync(DEMO_AUTH_PASSWORD, 10)
 const seedMarker = 'SIPREV synthetic demo seed - no real data / no use datos reales'
 
 const institutions = [
@@ -246,14 +249,14 @@ async function main() {
         displayName: user.displayName,
         role: user.role,
         status: 'ACTIVE',
-        passwordHash: null,
-        authProviderSubject: null,
+        passwordHash: demoPasswordHash,
+        authProviderSubject: `credentials:${user.email}`,
       },
       create: {
         ...user,
         status: 'ACTIVE',
-        passwordHash: null,
-        authProviderSubject: null,
+        passwordHash: demoPasswordHash,
+        authProviderSubject: `credentials:${user.email}`,
       },
     })
   }
