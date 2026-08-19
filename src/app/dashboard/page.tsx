@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { requireUser } from '@/lib/auth/current-user'
 import type { AuthenticatedUser } from '@/lib/auth/credentials'
+import { userCanViewAudit } from '@/lib/audit/audit-log-query'
 import { authorizedCasesWhereForUser } from '@/lib/cases/case-access-query'
 import { userCanCreateCase } from '@/lib/cases/create-case'
 import { prisma } from '@/lib/prisma'
@@ -39,6 +40,7 @@ export default async function DashboardPage() {
 
   const recentCases = await getRecentCases(user)
   const canRegisterCases = userCanCreateCase(user)
+  const canViewAudit = userCanViewAudit(user)
 
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-10 text-white lg:px-8">
@@ -65,6 +67,14 @@ export default async function DashboardPage() {
                   className="inline-flex rounded-full bg-teal-300 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-teal-200"
                 >
                   Registrar caso
+                </Link>
+              ) : null}
+              {canViewAudit ? (
+                <Link
+                  href="/audit"
+                  className="inline-flex rounded-full border border-cyan-300 px-5 py-3 text-sm font-semibold text-cyan-100 hover:bg-cyan-300/10"
+                >
+                  Auditoría
                 </Link>
               ) : null}
             </div>

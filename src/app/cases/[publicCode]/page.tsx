@@ -108,7 +108,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-teal-300">Detalle protegido</p>
           <h1 className="mt-3 text-3xl font-bold">{caseRecord.publicCode}</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-            {demoDataBoundary.warning} La consulta registra auditoría VIEW del lado servidor.
+            {demoDataBoundary.warning} No use datos reales. La consulta está bajo reserva legal y registra auditoría VIEW del lado servidor.
           </p>
         </header>
 
