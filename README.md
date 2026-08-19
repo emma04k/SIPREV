@@ -1,6 +1,6 @@
 # SIPREV — Sistema Protegido de Registro de Violencia
 
-SIPREV es un piloto educativo para demostrar cómo un sistema web protegido podría registrar, consultar y dar trazabilidad a casos de violencia entre instituciones autorizadas. Esta base técnica incluye la **Fase 1: Base técnica**, **Fase 2: Modelo de datos mínimo + seed sintético**, **Fase 3: autenticación y autorización inicial** y **Fase 4: registro protegido de casos demo**.
+SIPREV es un piloto educativo para demostrar cómo un sistema web protegido podría registrar, consultar y dar trazabilidad a casos de violencia entre instituciones autorizadas. Esta base técnica incluye la **Fase 1: Base técnica**, **Fase 2: Modelo de datos mínimo + seed sintético**, **Fase 3: autenticación y autorización inicial**, **Fase 4: registro protegido de casos demo** y **Fase 5: consulta controlada y seguimiento mínimo**.
 
 ## Advertencia de demo
 
@@ -73,23 +73,25 @@ docker compose exec app npm run db:verify
 
 El seed crea únicamente datos obvios de demo: instituciones `SIPREV-CENTRAL-DEMO`, `COMISARIA-DEMO-NORTE`, `FISCALIA-DEMO-CONTROL`, `AUDITORIA-DEMO`; usuarios con dominio `@siprev.local`; casos `SIPREV-DEMO-CASE-001` y `SIPREV-DEMO-CASE-002`; documentos `DEMO-...`. Los casos usan `nonSensitiveSummary` para dejar claro que el registro operativo no debe contener narrativa sensible.
 
-### 5. Smoke de autenticación y registro Fase 4
+### 5. Smoke de autenticación, registro, consulta y seguimiento Fase 5
 
 ```bash
 curl -I http://localhost:3000/auth/login
 curl -I http://localhost:3000/dashboard
 ```
 
-`/dashboard` debe redirigir a `/auth/login?next=/dashboard` cuando no hay sesión. Después de iniciar sesión, el dashboard muestra rol, institución, enlace **Registrar caso** para roles autorizados y un listado mínimo de casos recientes autorizados.
+`/dashboard` debe redirigir a `/auth/login?next=/dashboard` cuando no hay sesión. Después de iniciar sesión, el dashboard muestra rol, institución, enlace **Consultar casos**, enlace **Registrar caso** para roles autorizados y un listado mínimo de casos recientes autorizados.
 
 Flujo demo manual:
 
 1. Inicie sesión en `http://localhost:3000/auth/login` con `comisaria.demo@siprev.local` y `SiprevDemo2026!`.
-2. Abra `/cases/new` desde el botón **Registrar caso**.
-3. Complete únicamente datos sintéticos/ficticios. No use nombres, documentos, teléfonos, direcciones ni narrativas reales.
-4. Al registrar, la pantalla muestra un `publicCode` app-owned no sensible y el caso aparece en **Casos recientes** del dashboard.
+2. Abra `/cases` desde **Consultar casos** y filtre por estado, riesgo, tipo o código/resumen no sensible.
+3. Abra `/cases/SIPREV-DEMO-CASE-001`; la consulta registra auditoría VIEW (`AuditLog VIEW`) y muestra la línea de tiempo autorizada.
+4. Use el formulario de seguimiento con texto sintético únicamente. No use nombres, documentos, teléfonos, direcciones ni narrativas reales.
+5. Si selecciona un estado nuevo válido, el seguimiento crea un evento en la línea de tiempo, actualiza el estado del caso y registra auditoría UPDATE (`AuditLog UPDATE`) sin duplicar datos personales en metadata.
+6. Para registrar un caso nuevo, abra `/cases/new`, complete únicamente datos sintéticos/ficticios y confirme que el `publicCode` app-owned aparece luego en `/cases`.
 
-Smoke JSON opcional para `POST /api/cases` dentro de Compose, sin imprimir cookies ni tokens:
+Smoke JSON opcional para `POST /api/cases` y `POST /api/cases/[publicCode]/events` dentro de Compose, sin imprimir cookies ni tokens:
 
 ```bash
 # 1) Autenticarse con Auth.js en un cookie jar local temporal.
@@ -103,8 +105,18 @@ curl -s -o /dev/null -b /tmp/siprev-cookies.txt -c /tmp/siprev-cookies.txt \
 # 2) Crear un caso sintético y verificar que devuelve HTTP 201 + publicCode.
 curl -s -w '\nHTTP %{http_code}\n' -b /tmp/siprev-cookies.txt \
   -H 'Content-Type: application/json' \
-  -d '{"caseType":"INITIAL_REPORT","violenceTypes":["PHYSICAL"],"riskLevel":"HIGH","nonSensitiveSummary":"Resumen sintético sin datos reales para smoke Fase 4.","protectedPerson":{"demoFullName":"Persona Demo Smoke","demoDocumentNumber":"DEMO-SMOKE-001","demoBirthYear":1990},"initialEvent":{"title":"Recepción inicial demo","detail":"Evento sintético creado por smoke Docker."}}' \
+  -d '{"caseType":"INITIAL_REPORT","violenceTypes":["PHYSICAL"],"riskLevel":"HIGH","nonSensitiveSummary":"Resumen sintético sin datos reales para smoke Fase 5.","protectedPerson":{"demoFullName":"Persona Demo Smoke","demoDocumentNumber":"DEMO-SMOKE-001","demoBirthYear":1990},"initialEvent":{"title":"Recepción inicial demo","detail":"Evento sintético creado por smoke Docker."}}' \
   http://localhost:3000/api/cases
+
+# 3) Consultar listado/detalle autorizado y registrar seguimiento sintético.
+curl -s -o /dev/null -w 'GET /cases -> HTTP %{http_code}\n' -b /tmp/siprev-cookies.txt \
+  'http://localhost:3000/cases?status=IN_FOLLOW_UP&q=SIPREV-DEMO-CASE-001'
+curl -s -o /dev/null -w 'GET detail -> HTTP %{http_code}\n' -b /tmp/siprev-cookies.txt \
+  http://localhost:3000/api/cases/SIPREV-DEMO-CASE-001
+curl -s -w '\nHTTP %{http_code}\n' -b /tmp/siprev-cookies.txt \
+  -H 'Content-Type: application/json' \
+  -d '{"category":"FOLLOW_UP","title":"Seguimiento demo smoke","detail":"Nota sintética de seguimiento sin datos reales.","newStatus":"IN_FOLLOW_UP"}' \
+  http://localhost:3000/api/cases/SIPREV-DEMO-CASE-001/events
 ```
 
 ### 6. Apagar el entorno local
@@ -128,13 +140,16 @@ Todas las cuentas institucionales seed usan la contraseña local de demo `Siprev
 
 Estas credenciales son solo para Docker/local educativo. No existe registro público, recuperación pública ni autoalta de usuarios.
 
-## Rutas Fase 3 y Fase 4
+## Rutas Fase 3 a Fase 5
 
-- `/auth/login`: formulario institucional Auth.js Credentials sin registro público.
-- `/dashboard`: ruta privada protegida por middleware y `requireUser` del lado servidor; muestra acceso a registro y casos recientes autorizados.
+- `/auth/login`: formulario institucional Auth.js Credentials sin autoalta de usuarios.
+- `/dashboard`: ruta privada protegida por middleware y `requireUser` del lado servidor; muestra acceso a consulta, registro y casos recientes autorizados.
+- `/cases`: página protegida de consulta autorizada con filtros server-side por `status`, `riskLevel`, `caseType` y búsqueda acotada por código/resumen no sensible.
+- `/cases/[publicCode]`: página protegida de detalle con datos demo, línea de tiempo, auditoría `VIEW` fail-closed y formulario de seguimiento/cambio de estado.
 - `/cases/new`: formulario institucional protegido para registrar únicamente casos sintéticos de demo, con advertencia fuerte de no usar datos reales y confirmación por `publicCode`.
 - `/api/cases`: endpoint `POST` protegido para crear casos. Deriva usuario/institución desde sesión, valida con Zod, escribe caso/persona/evento/asignación/auditoría en transacción y responde solo datos no sensibles.
 - `/api/cases/[publicCode]`: endpoint protegido que aplica `canAccessCase` y registra auditoría `VIEW` al consultar un caso demo.
+- `/api/cases/[publicCode]/events`: endpoint `POST` protegido para seguimiento. Deriva actor/institución desde sesión, verifica `canAccessCase`, valida categoría/textos/estado con Zod, crea `CaseEvent`, opcionalmente actualiza `Case.status` y registra `AuditLog UPDATE` sin datos personales en metadata.
 
 ## Scripts de base de datos
 
@@ -186,22 +201,22 @@ Variables principales:
 - `NEXTAUTH_SECRET` / `AUTH_SECRET`: secretos de Auth.js; los valores del repo son placeholders demo-only.
 - `SIPREV_DEMO_PASSWORD`: referencia local de la contraseña seed demo; no es un override de runtime y no debe tratarse como secreto productivo.
 
-## Estado de Fase 4
+## Estado de Fase 5
 
 Incluido:
 
 1. Formulario protegido `/cases/new` en español con advertencia fuerte de demo local y prohibición de datos reales.
-2. Schema Zod `createCaseInputSchema` con límites de longitud, enums de dominio y rechazo de IDs/códigos enviados por cliente.
-3. Servicio `createCase` con autorización para `SYSTEM_ADMIN`, `INSTITUTION_ADMIN`, `CASE_WORKER` y `PROSECUTOR`; `AUDITOR`, usuarios inactivos e instituciones inactivas no pueden crear.
-4. Escritura transaccional de `Case`, `ProtectedPerson`, `AggressorReference` opcional, `CaseEvent` inicial `INTAKE`, `CaseAssignment` activa y `AuditLog CREATE` sin datos personales en metadata.
-5. Endpoint `POST /api/cases` con respuestas `401`, `403`, `400`, `201` y fallo cerrado genérico si falla la transacción/auditoría.
-6. Dashboard con enlace de registro y listado mínimo de casos recientes autorizados para comprobar que el caso creado aparece.
+2. Consulta protegida `/cases` con filtros autorizados server-side (`status`, `riskLevel`, `caseType`, `q`) sin ampliar RBAC.
+3. Detalle protegido `/cases/[publicCode]` con datos demo, timeline de `CaseEvent` y auditoría `VIEW` fail-closed.
+4. Endpoint `/api/cases/[publicCode]/events` y formulario de seguimiento con validación Zod, categorías permitidas y cambio de estado a valores existentes de `CaseStatus`.
+5. Escrituras transaccionales para seguimiento: `CaseEvent` + `AuditLog UPDATE` y, si corresponde, `Case.status`/`closedAt`, derivando actor e institución desde la sesión autenticada.
+6. Auditoría sin duplicar datos personales protegidos en metadata; errores genéricos para usuario/API.
+7. Dashboard con enlaces a consulta, detalle y registro autorizado.
 
 No incluido todavía:
 
-- UI completa de consulta/detalle/listado de casos; queda para Fase 5.
-- Seguimiento, cambio de estado, remisiones o cierre de casos.
 - Administración de usuarios institucionales.
+- UI administrativa de auditoría agregada; Fase 5 solo escribe `AuditLog VIEW`/`UPDATE`.
 - Cifrado de campos sensibles.
 - Migraciones aplicadas a Neon real.
 - Uso de datos reales.
@@ -209,4 +224,4 @@ No incluido todavía:
 
 ## Siguiente fase recomendada
 
-Fase 5: consulta controlada y seguimiento mínimo de casos con vistas por rol, búsqueda por código no sensible, eventos de timeline y endurecimiento de manejo de datos sensibles.
+Fase 6: administración institucional y vista controlada de auditoría para responsables autorizados, manteniendo datos sintéticos hasta revisión legal/productiva.

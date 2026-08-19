@@ -52,14 +52,22 @@ export default async function DashboardPage() {
                 Use únicamente datos sintéticos en la demo local. SIPREV no habilita registro público.
               </p>
             </div>
-            {canRegisterCases ? (
+            <div className="flex flex-wrap gap-3">
               <Link
-                href="/cases/new"
-                className="inline-flex rounded-full bg-teal-300 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-teal-200"
+                href="/cases"
+                className="inline-flex rounded-full border border-teal-300 px-5 py-3 text-sm font-semibold text-teal-100 hover:bg-teal-300/10"
               >
-                Registrar caso
+                Consultar casos
               </Link>
-            ) : null}
+              {canRegisterCases ? (
+                <Link
+                  href="/cases/new"
+                  className="inline-flex rounded-full bg-teal-300 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-teal-200"
+                >
+                  Registrar caso
+                </Link>
+              ) : null}
+            </div>
           </div>
           <div className="mt-6 grid gap-4 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-slate-900 p-4">
@@ -104,7 +112,9 @@ export default async function DashboardPage() {
               recentCases.map((caseRecord) => (
                 <article key={caseRecord.publicCode} className="grid gap-2 py-4 md:grid-cols-[1fr_auto]">
                   <div>
-                    <p className="font-semibold text-teal-100">{caseRecord.publicCode}</p>
+                    <Link href={`/cases/${caseRecord.publicCode}`} className="font-semibold text-teal-100 hover:text-teal-200">
+                      {caseRecord.publicCode}
+                    </Link>
                     <p className="mt-1 text-sm text-slate-300">{caseRecord.nonSensitiveSummary}</p>
                   </div>
                   <p className="text-sm text-slate-400">
